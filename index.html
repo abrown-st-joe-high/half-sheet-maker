@@ -54,6 +54,8 @@ textarea{width:100%;height:340px;font:14px/1.4 ui-monospace,Menlo,monospace;padd
 }
 </style>
 <style id="page"></style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
 </head>
 <body>
 <header>
@@ -69,7 +71,7 @@ textarea{width:100%;height:340px;font:14px/1.4 ui-monospace,Menlo,monospace;padd
 <main>
   <section class="panel">
     <textarea id="md" spellcheck="false" aria-label="Markdown"></textarea>
-    <div class="help"><code># Title</code> &nbsp; <code>## Header</code> &nbsp; <code>### Subheader</code> &nbsp; <code>- item</code> &nbsp; <code>**bold**</code> &nbsp; <code>*italic*</code> &nbsp; plain lines become paragraphs.</div>
+    <div class="help"><code># Title</code> &nbsp; <code>## Header</code> &nbsp; <code>### Subheader</code> &nbsp; <code>- item</code> &nbsp; <code>**bold**</code> &nbsp; <code>*italic*</code> &nbsp; plain lines become paragraphs. &nbsp; Math (LaTeX): <code>$x^2$</code> inline, <code>$$\frac{a}{b}$$</code> display, <code>\$</code> for a literal dollar sign.</div>
     <div style="display:flex;flex-wrap:wrap;gap:10px">
       <label>Layout
         <select id="layout">
@@ -100,7 +102,20 @@ const CUR = 'hsm.current', LIB = 'hsm.library';
 
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function inline(s){
-  return esc(s).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/\*([^*\s][^*]*?)\*/g,'<i>$1</i>');
+  const store = [];
+  s = s.replace(/\\\$/g, '\u0001');
+  s = s.replace(/\$\$([^$]+?)\$\$|\$([^\s$](?:[^$]*?[^\s$])?)\$(?!\d)/g, (m, d, t) => {
+    const tex = (d !== undefined ? d : t).replace(/\u0001/g, '\\$'), disp = d !== undefined;
+    let h;
+    try {
+      h = window.katex ? katex.renderToString(tex, {displayMode: disp, throwOnError: false})
+                       : '<code>' + esc(m.replace(/\u0001/g, '\\$')) + '</code>';
+    } catch (e) { h = '<code>' + esc(m) + '</code>'; }
+    store.push(h);
+    return '\u0000' + (store.length - 1) + '\u0000';
+  });
+  s = esc(s).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/\*([^*\s][^*]*?)\*/g,'<i>$1</i>');
+  return s.replace(/\u0000(\d+)\u0000/g, (m, i) => store[i]).replace(/\u0001/g, '$');
 }
 function toHtml(text){
   let out = '', inList = false;
@@ -187,6 +202,7 @@ let init = null;
 try { init = JSON.parse(localStorage.getItem(CUR)); } catch(e){}
 apply(init && typeof init.md === 'string' ? init : {md: TEMPLATE, layout:'portrait', size:14, boxes:false});
 drawLib();
+window.addEventListener('load', render);
 </script>
 </body>
 </html>
